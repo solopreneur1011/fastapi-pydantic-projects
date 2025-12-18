@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from openai import OpenAI
 import requests
 from fastapi import Form, HTTPException
@@ -17,7 +17,7 @@ except requests.ConnectionError:
     raise RuntimeError("Ollama is not running. Start it with 'ollama serve'")
 
 
-class CodeReviewResponse(BaseModel):
+class CodeReviewForm(BaseModel):
     review: str
 
 
@@ -33,13 +33,14 @@ def home():
     return {"message": "Welcome to the Local AI Code Reviewer! Use POST /review to submit code."}
 
 
-@app.post("/review", response_model=CodeReviewResponse)
-async def review_code(
-    code: str = Form(...),
-    file: Optional[UploadFile] = File(None),
-    language: str = Form("python"),
-    model: str = Form("gemma2")  # Change to your pulled model
-):
+# get endpoint
+@app.post("/review")
+async def review_code(code: Optional[str] = Form(None),
+        file: Optional[UploadFile] = File(None),
+        language: str = Form("python"),
+        model: str = Form("deepseek-coder-v2")
+    ):
+    
     if not code and not file:
         raise HTTPException(status_code=400, detail="Provide either 'code' or 'file'.")
 
@@ -49,7 +50,6 @@ async def review_code(
             code = content.decode("utf-8")
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="File must be text/UTF-8 encoded.")
-
     if not code.strip():
         raise HTTPException(status_code=400, detail="Code cannot be empty.")
 
@@ -61,7 +61,7 @@ async def review_code(
 
     try:
         response = client.chat.completions.create(
-            model=model,
+            model="gemma2",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": code}
@@ -73,5 +73,5 @@ async def review_code(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI review failed: {str(e)}")
 
-    return CodeReviewResponse(review=review)
+    return CodeReviewForm(review=review)
 
