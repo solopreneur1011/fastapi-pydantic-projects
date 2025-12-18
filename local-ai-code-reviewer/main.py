@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from openai import OpenAI
 import requests
 from fastapi import Form, HTTPException
+from fastapi import UploadFile, File
+from typing import Optional
 
 client = OpenAI(
     base_url="http://localhost:11434/v1",  # Ollama local endpoint
@@ -34,9 +36,20 @@ def home():
 @app.post("/review", response_model=CodeReviewResponse)
 async def review_code(
     code: str = Form(...),
+    file: Optional[UploadFile] = File(None),
     language: str = Form("python"),
-    model: str = Form("deepseek-coder-v2")  # Change to your pulled model
+    model: str = Form("gemma2")  # Change to your pulled model
 ):
+    if not code and not file:
+        raise HTTPException(status_code=400, detail="Provide either 'code' or 'file'.")
+
+    if file:
+        content = await file.read()
+        try:
+            code = content.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="File must be text/UTF-8 encoded.")
+
     if not code.strip():
         raise HTTPException(status_code=400, detail="Code cannot be empty.")
 
